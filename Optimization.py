@@ -23,10 +23,8 @@ exit_hour_buy = False
 instrument = 'UNH'
 hora_ini = '09:30:00'
 hora_fin = '16:00:00'
-tempo = 1
-#num_bars = 4
+tempo = 5
 tempo_h = 1/12
-#num_bars_h = int((num_bars*tempo)/tempo_h)
 account = 20000
 risk = 0.01
 profit_buy_pos = 0
@@ -39,7 +37,7 @@ total = []
 final_results = []
 
 ## Bar Progress
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '#'):
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 3, length = 100, fill = '#'):
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
@@ -71,7 +69,7 @@ def resample_data (df, tempo_in, tempo_out):
 historical_0 = pd.read_csv(instrument+'_5secs.csv').set_index('date')
 historical_0.index = pd.to_datetime(historical_0.index)
 historical = historical_0
-#historical = resample_data(historical_0, 1/12, 1).dropna()
+historical = resample_data(historical_0, 1/12, tempo_h).dropna()
 
 # Setting the initial and final date to get days of evaluation
 
@@ -86,7 +84,7 @@ dates = [str((pd.to_datetime(initial_date) + timedelta(days=x)).strftime("%Y/%m/
 ## target
 start = 0.50
 paso = 0.01
-stop = 0.70
+stop = 0.60
 
 list_iter_target = np.round(list(np.arange(start,stop+paso,paso)),2)
 print(list_iter_target)
@@ -109,7 +107,7 @@ len_ite_tempo = len(list_ite_tempo)
 total = pd.DataFrame(total)
 final_results = pd.DataFrame(final_results)
 
-total_iteration = len_ite_tempo*len_ite_num_bars*len_ite_tar
+total_iteration = len_ite_tempo*len_ite_num_bars*len_ite_tar*delta
 iteration_0 = 0
 
 # Main Code to calculate the Optimization results
@@ -118,8 +116,10 @@ for tempo in list_ite_tempo:
     for num_bars in list_ite_num_bars:
         num_bars_h = int((num_bars*tempo)/tempo_h)
         for target_ite in list_iter_target:
-            printProgressBar(iteration_0 + 1, total_iteration, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            #printProgressBar(iteration_0 + 1, total_iteration, prefix = 'Progress:', suffix = 'Complete', length = 50)
             for date in dates:
+                printProgressBar(iteration_0 + 1, total_iteration, prefix = 'Progress:', suffix = 'Complete', length = 50)
+                
                 #Getting the historical piece of data to evaluate
                 hist = historical.loc[date,:]
 
@@ -242,6 +242,7 @@ for tempo in list_ite_tempo:
                 exit_hour_sell = exit_target_buy = False
                 exit_range_buy = exit_hour_buy = False
                 calc_buy = calc_sell = False
+                iteration_0+=1
 
             #Extern For cycle
             #Naming the total table
@@ -294,7 +295,7 @@ for tempo in list_ite_tempo:
             #Restart variables-----------------------
             total = []
             total = pd.DataFrame(total)
-            iteration_0+=1
+            #iteration_0+=1
 
 final_results.index.names = ['temporality']
 final_results.columns = ['num of bars', 'target', 'net profit', 
