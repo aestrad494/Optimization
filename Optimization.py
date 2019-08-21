@@ -1,23 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-## Optimization Attemp 2
-
+## Optimization Script
 #### Importing Packages
 
-from ib_insync import *
-#util.startLoop()
 import pandas as pd
 import numpy as np
-import datetime
-import calendar
-import time
-from IPython.display import clear_output
-import pytz
-import smtplib
-import math
+from math import floor
 from datetime import timedelta
 import matplotlib.pyplot as plt
+from Backtesting_Class import Backtesting_Strategy
 
 #### Definning variable
 
@@ -27,13 +19,11 @@ exit_hour_sell = False
 exit_target_buy = False
 exit_range_buy = False
 exit_hour_buy = False
-in_dd = False
 
-instrument = 'JPM'
+instrument = 'UNH'
 hora_ini = '09:30:00'
 hora_fin = '16:00:00'
-client = 100
-#tempo = 5
+tempo = 1
 #num_bars = 4
 tempo_h = 1/12
 #num_bars_h = int((num_bars*tempo)/tempo_h)
@@ -48,7 +38,7 @@ exit_sell = 0
 total = []
 final_results = []
 
-#### Bar Progress
+## Bar Progress
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '#'):
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
@@ -58,15 +48,8 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     if iteration == total: 
         print()
 
-#### Calculate Comission Function
-def calc_commission(shares):
-    commission = shares * 0.005
-    if (commission < 1):
-        commission = 1
-    return(commission)
 
-#### Resample Data
-
+## Resample Data
 def resample_data (df, tempo_in, tempo_out):
     res = str(tempo_out)+'Min'
     
@@ -84,74 +67,42 @@ def resample_data (df, tempo_in, tempo_out):
         print('no fue posible hacer la conversion')
         return (df)
 
-#### Download Data
-
-#historical = pd.read_csv('BABA_5min.csv').set_index('date')
-
-historical_0 = pd.read_csv('data/JPM_5secs.csv').set_index('date')
+# Getting Data 
+historical_0 = pd.read_csv(instrument+'_5secs.csv').set_index('date')
 historical_0.index = pd.to_datetime(historical_0.index)
 historical = historical_0
 #historical = resample_data(historical_0, 1/12, 1).dropna()
 
-#### Setting the initial and final date to get days of evaluation
+# Setting the initial and final date to get days of evaluation
 
 initial_date = '2018/06/08'
-final_date = '2019/06/05'
+final_date = '2019/06/14'
 
-d0 = pd.to_datetime(initial_date)
-d1 = pd.to_datetime(final_date)
-delta = d1 - d0
-delta = delta.days + 1
-print(delta)
+delta = (pd.to_datetime(final_date) - pd.to_datetime(initial_date)).days + 1
 
-dates = []
-for i in range(delta):
-    date_n = pd.to_datetime(initial_date) + timedelta(days=i)
-    date = str(date_n.strftime("%Y/%m/%d" ))
-    dates += [date]
+dates = [str((pd.to_datetime(initial_date) + timedelta(days=x)).strftime("%Y/%m/%d")) for x in range(delta)]
 
-#### Setting variables to optimize
-
-##### target
-
+# Setting variables to optimize
+## target
 start = 0.50
 paso = 0.01
 stop = 0.70
 
-list_iter_target = []
-actual = 0
-while actual <= stop:
-    if actual == 0:
-        actual = start
-    if actual > 0:
-        list_iter_target.append(actual)
-        actual = round(actual + paso,2)
-
+list_iter_target = np.round(list(np.arange(start,stop+paso,paso)),2)
 print(list_iter_target)
-
 len_ite_tar = len(list_iter_target)
 
-##### number of vars
-
+## number of bars
 start = 1
 paso = 1
 stop = 3
 
-list_ite_num_bars = []
-actual = 0
-while actual <= stop:
-    if actual == 0:
-        actual = start
-    if actual > 0:
-        list_ite_num_bars.append(actual)
-        actual = round(actual + paso,2)
-
+list_ite_num_bars = list(np.arange(start,stop+paso,paso))
 print(list_ite_num_bars)
 len_ite_num_bars = len(list_ite_num_bars)
 
-##### Temporality
-
-list_ite_tempo = [1]#[1, 2, 5]
+## Temporality
+list_ite_tempo = [tempo]
 print(list_ite_tempo)
 len_ite_tempo = len(list_ite_tempo)
 
@@ -161,21 +112,14 @@ final_results = pd.DataFrame(final_results)
 total_iteration = len_ite_tempo*len_ite_num_bars*len_ite_tar
 iteration_0 = 0
 
-#### Main Code to calculate the Optimization results
+# Main Code to calculate the Optimization results
 
-for e in range(len_ite_tempo):   
-    tempo = list_ite_tempo[e]
-    for g in range (len_ite_num_bars):
-        num_bars = list_ite_num_bars[g]
+for tempo in list_ite_tempo:   
+    for num_bars in list_ite_num_bars:
         num_bars_h = int((num_bars*tempo)/tempo_h)
-        for f in range(len_ite_tar): 
-            target_ite = list_iter_target[f]
-            
+        for target_ite in list_iter_target:
             printProgressBar(iteration_0 + 1, total_iteration, prefix = 'Progress:', suffix = 'Complete', length = 50)
-            for i in range(delta):
-                #date to evaluate
-                date = dates[i]
-
+            for date in dates:
                 #Getting the historical piece of data to evaluate
                 hist = historical.loc[date,:]
 
@@ -185,7 +129,7 @@ for e in range(len_ite_tempo):
                     minimum = hist.low.rolling(num_bars_h).min()[num_bars_h-1]
                     range_tam = round(maximum - minimum,2)
                     target = target_ite
-                    lots = math.floor((account*risk)/(maximum-minimum)) 
+                    lots = floor((account*risk)/(maximum-minimum)) 
                 else:
                     maximum = minimum = 0
                     range_tam = target = lots = 0
@@ -299,89 +243,43 @@ for e in range(len_ite_tempo):
                 exit_range_buy = exit_hour_buy = False
                 calc_buy = calc_sell = False
 
-
-                #print('for 0: ', e+1,'/', len_ite_tempo, ', tempo: ', tempo,
-                #      ' || for 1: ', g+1,'/', len_ite_num_bars, ', num bars: ', num_bars,
-                #      ' || for 2: ',f+1,'/',len_ite_tar,', target: ', round(target_ite,2) , 
-                #      ' || for 3: ', i+1,'/',delta)
-                #clear_output(wait=True)
-		
-
             #Extern For cycle
             #Naming the total table
             total.index.names = ['date']
             total.columns = ['final profit buy', 'final profit sell', 'max profit buy', 'max profit sell', 'min profit buy', 'min profit sell', 'lots']
-
-            #Total profit
-            results_long = total['final profit buy']*total['lots']
-            results_short = total['final profit sell']*total['lots']
-            pf_buy_usd = round(results_long.sum(),2)
-            pf_sell_usd = round(results_short.sum(),2)
-            total_profit_usd = round(pf_buy_usd + pf_sell_usd,2)
-
+            #Profit by day
             total['profit usd'] = (total['final profit buy']+total['final profit sell'])*total['lots']
+            #Accumulated Profit
+            total['accumulated profit'] = total['profit usd'].cumsum() + account
+            total['max profit'] = total['accumulated profit'].cummax()
 
-            #Commissions
-            commissions_per_trade = total['lots'].apply(calc_commission)
-            trades_per_day = [0]*delta
-            for h in range(delta):
-                entry_buys = total['final profit buy'] != 0
-                entry_sells = total['final profit sell'] != 0
-                trades_per_day[h] = entry_buys[h] * 2 + entry_sells[h] * 2
-            total['commissions'] = commissions_per_trade * trades_per_day
-            sum_commissions = total['commissions'].sum()
+            #Instantiating Backtesting Class
+            back = Backtesting_Strategy(total)
 
+            #--------- Results ---------
+            
             #Net Profit -----------------------
-            total['net profit'] = total['profit usd'] - total['commissions']
-            net_profit = total_profit_usd - sum_commissions
-
-            #Gross Profit
-            profit_long = results_long[results_long > 0].sum()
-            profits_short = results_short[results_short > 0].sum()
-            total_profits = profit_long + profits_short
-
-            #Gross Loss
-            losses_long = results_long[results_long < 0].sum()
-            losses_short = results_short[results_short < 0].sum()
-            total_losses = losses_long + losses_short
+            ##Total profit
+            total_profit_usd = back.final_profit_usd()
+            ##Total Commissions
+            total_commissions = back.total_commissions()
+            
+            net_profit = total_profit_usd - total_commissions
 
             #Profit Factor -----------------------
-            profit_factor = round(abs(total_profits/total_losses),2)
-
-            #Number of trades
-            shorts = total['final profit sell'] != 0
-            number_shorts = shorts.sum()
-            longs = total['final profit buy'] != 0
-            number_longs = longs.sum()
-            total_trades = number_longs + number_shorts
+            ##Gross Profit and Loss
+            gross_profit, gross_loss = back.gross_profit_and_loss()
+            
+            profit_factor = round(abs(gross_profit/gross_loss),2)
 
             #Expected Payoff ---------------------------
+            ##Number of trades
+            total_trades, total_positive, total_negative, percent_total = back.transactions_info('total')
+            
             expected_payoff = round(net_profit / total_trades,2)
 
-            #Accumulated Profit
-            total['accumulated profit'] = 0
-            ind_net = total.columns.get_loc("net profit")
-            ind_acc = total.columns.get_loc("accumulated profit")
-            for l in range(delta):
-                if (l == 0):
-                    total.iloc[l,ind_acc] = account + total.iloc[l,ind_net]
-                if (l > 0):
-                    total.iloc[l,ind_acc] = total.iloc[l-1,ind_acc] + total.iloc[l,ind_net]
-
-            total['max profit'] = 0
-            ind_max = total.columns.get_loc("max profit")
-            for i in range(delta):
-                if (i == 0):
-                    total.iloc[i,ind_max] = total.iloc[i,ind_acc]
-                if (i > 0):
-                    if (total.iloc[i,ind_acc] > total.iloc[i-1,ind_max]):
-                        total.iloc[i,ind_max] = total.iloc[i,ind_acc]
-                    else:
-                        total.iloc[i,ind_max] = total.iloc[i-1,ind_max]
-
             #Maximal Drawdown -----------------
-            drawdown = total['max profit'] - total['accumulated profit']
-            max_drawdown = drawdown.max()
+            max_drawdown, max_draw_date = back.max_drawdown()
 
             #Relative Drawdown -------------------------
             relative_drawdown = round((max_drawdown/account)*100,2)
@@ -404,4 +302,4 @@ final_results.columns = ['num of bars', 'target', 'net profit',
 
 final_results['profit_dd'] = final_results['net profit'] / final_results['max drawdown']
 
-final_results.to_csv('results_jpm_5secs_1min.csv')
+final_results.to_csv('results_'+instrument+'_5secs_'+str(tempo)+'min.csv')
